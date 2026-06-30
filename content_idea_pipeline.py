@@ -4,6 +4,7 @@ import feedparser
 from openai import OpenAI
 from dotenv import load_dotenv
 from datetime import datetime
+from scraper import scrape_hacker_news
 
 load_dotenv()
 
@@ -33,7 +34,8 @@ def fetch_headlines(topic="tech"):
 def pick_best_story(articles):
     articles_text = ""
     for i, article in enumerate(articles):
-        articles_text += f"{i+1}. Title: {article['title']}\n   Snippet: {article['summary']}\n\n"
+        # Pass the actual link directly into the prompt text
+        articles_text += f"{i+1}. Title: {article['title']}\n   Link: {article['link']}\n\n"
 
     prompt = f"""
 You are a social media strategist. Here are 5 news articles:
@@ -41,12 +43,15 @@ You are a social media strategist. Here are 5 news articles:
 {articles_text}
 
 Pick the ONE article with the highest viral potential on social media.
-Return ONLY valid JSON, no extra text:
+Return ONLY valid JSON, no extra text. 
 
+CRITICAL: Do NOT include any code comments (like // or #) inside or outside the JSON string. 
+
+Return exactly this structure:
 {{
     "chosen_index": the number (1-5) of the article you picked,
     "title": "the article title",
-    "link": "the article link",
+    "link": "the exact article link from the list above",
     "reason": "one sentence explaining exactly why this story has the most viral potential"
 }}
 """
@@ -73,7 +78,7 @@ Return ONLY valid JSON, no extra text:
             "link": articles[0]["link"],
             "reason": "Fallback to first article due to parse error."
         }
-
+        
 def generate_social_posts(story):
     prompt = f"""
 You are a social media copywriter. Based on this news story, write 3 social media posts.
@@ -114,7 +119,7 @@ Return ONLY valid JSON, no extra text:
 def main():
     topic = "tech"
     print(f"Fetching {topic} headlines...\n")
-    articles = fetch_headlines(topic)
+    articles = scrape_hacker_news(limit=5)
 
     print("Step 1: Picking the best story...\n")
     best_story = pick_best_story(articles)
