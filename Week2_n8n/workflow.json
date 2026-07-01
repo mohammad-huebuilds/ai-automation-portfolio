@@ -1,0 +1,227 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "maxItems": 5
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "887bd742-3cf7-4d8e-b3ac-eb79493a888e",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify(\"You are a news analyst. Summarize this article in one sentence and classify it as AI, Business, or Tech. Return ONLY valid JSON: {\\\"summary\\\": \\\"your summary\\\", \\\"category\\\": \\\"AI|Business|Tech\\\"}.\\n\\nTitle: \" + $json.title + \"\\nSnippet: \" + ($json.contentSnippet || $json.snippet || \"\")) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "dc315b66-bdd2-44ec-a3c2-895c0b399843",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BshhRNQW9P5eok5A",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const raw = item.json.choices[0].message.content.trim();\n  \n  let parsed;\n  try {\n    parsed = JSON.parse(raw);\n  } catch (e) {\n    parsed = { summary: \"Could not parse\", category: \"Unknown\" };\n  }\n  \n  items.push({\n    json: {\n      summary: parsed.summary,\n      category: parsed.category,\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "0baf40b2-d7bd-4d49-b5d6-b9b4f54d4b9a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1qlxU5ERyBdruHWvwZkVmgULGFU_JN_EloXFZsxwb4y8",
+          "mode": "list",
+          "cachedResultName": "AI News Digest",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1qlxU5ERyBdruHWvwZkVmgULGFU_JN_EloXFZsxwb4y8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1qlxU5ERyBdruHWvwZkVmgULGFU_JN_EloXFZsxwb4y8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Title": "={{ $('RSS Read').item.json.title }}",
+            "Summary": "={{ $json.summary }}",
+            "Category": "={{ $json.category }}",
+            "Link": "={{ $('RSS Read').item.json.link }}",
+            "Timestamp": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "Title"
+          ],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        832,
+        0
+      ],
+      "id": "8a57e9d8-6b0c-40a9-a8a8-4eb5e3ae6d33",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "db4b120d-aa48-400c-8779-731ff6ec34dc",
+      "name": "RSS Read"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b85eb108-72e1-45f9-a833-1fc60bc7ad3a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "25b26745c7504fc3c9e13bd839c38398823de222a8c910646fe2f2863077c635"
+  },
+  "id": "7B0bU9DhxyhnkhIL",
+  "tags": []
+}
