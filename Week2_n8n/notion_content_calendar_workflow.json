@@ -1,0 +1,159 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d19527c3-d2c5-47d0-b9b0-c4c64969c27e",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const topics = [\n  \"How AI agents are changing content creation\",\n  \"The best no-code automation tools for small businesses in 2025\",\n  \"How to build a personal brand using AI tools\",\n  \"Why most automation projects fail and how to avoid it\",\n  \"The difference between AI assistants and AI agents\"\n];\n\n// Pick one topic based on the current day of the week\n// so each day of the week gets a different topic\nconst dayIndex = new Date().getDay();\nconst topic = topics[dayIndex % topics.length];\n\nreturn [{ json: { topic } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "ef3dea55-cc41-4ceb-99bb-154416a8e0c7",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a content strategist. Create a detailed content brief for this topic: {{ $json.topic }}\\n\\nThe brief should include:\\n1. A suggested headline\\n2. The target audience\\n3. Three main points to cover\\n4. A suggested call to action\\n\\nWrite it as clean readable text, not JSON. Keep it under 200 words.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "d2dc464e-80dd-4086-907c-9499eb8c1f8b",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "3914f3bb-193c-804b-86e8-f8298b9a78d5",
+          "mode": "list",
+          "cachedResultName": "Content Calendar1",
+          "cachedResultUrl": "https://app.notion.com/p/3914f3bb193c804b86e8f8298b9a78d5"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Topic|title",
+              "title": "={{ $('Code in JavaScript').item.json.topic }}"
+            },
+            {
+              "key": "Brief|rich_text",
+              "textContent": "={{ $json.choices[0].message.content }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "draft"
+            },
+            {
+              "key": "Created Date|date",
+              "date": "={{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "d55fe2e0-fac6-43a2-8995-6093dd379f28",
+      "name": "Create a database page",
+      "credentials": {
+        "notionApi": {
+          "id": "RKjPARGf1xUE943U",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Create a database page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3559d8c8-ddf7-4c21-814f-4458f4cf039b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "25b26745c7504fc3c9e13bd839c38398823de222a8c910646fe2f2863077c635"
+  },
+  "id": "c4qNdidO0mDk7Scg",
+  "tags": []
+}
