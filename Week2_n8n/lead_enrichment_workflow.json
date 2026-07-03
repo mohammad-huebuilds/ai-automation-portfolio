@@ -1,0 +1,372 @@
+{
+  "name": "Day11",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -96
+      ],
+      "id": "8e3f3e62-1d4a-4f65-9614-b692efe1f7ec",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs",
+          "mode": "list",
+          "cachedResultName": "Lead Enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Description"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        -96
+      ],
+      "id": "3b3b4850-2b5e-49b6-b0d6-ad60d4a0c673",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e75ea9c8-c2c5-4e86-a102-2e46a32c3a61",
+              "leftValue": "={{ $json.Website }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "70a7c191-ad69-4156-a9e6-e91b893c68f9",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.Website }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        -96
+      ],
+      "id": "9bf666c8-423f-49ee-ab77-17aec153ee41",
+      "name": "HTTP Request",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map over ALL items in the input, not just the first one\nreturn $input.all().map(item => {\n  const html = item.json.data || \"\";\n\n  // Strip HTML tags\n  const text = html\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, \"\")\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, \"\")\n    .replace(/<[^>]+>/g, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\n  const trimmed = text.substring(0, 2000);\n\n  // Return the object for THIS specific row\n  return {\n    json: {\n      website_text: trimmed,\n      company_name: item.json['Company Name'],\n      website: item.json.Website\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -96
+      ],
+      "id": "97180f4a-eedb-48a4-92d7-b8c14c55541a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a business analyst. Based on this company website text, analyze the company.\\n\\nCompany: {{ $json.company_name }}\\nWebsite text: {{ $json.website_text }}\\n\\nReturn ONLY valid JSON, no extra text:\\n{\\n  \\\"description\\\": \\\"one sentence explaining what this company does\\\",\\n  \\\"industry\\\": \\\"the industry they operate in, 2-3 words\\\",\\n  \\\"pain_points\\\": [\\\"pain point 1\\\", \\\"pain point 2\\\", \\\"pain point 3\\\"]\\n}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        -96
+      ],
+      "id": "d6ddb94d-c305-4acb-bbc2-a996ccf74f90",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map over all incoming items from the Groq node\nreturn $input.all().map(item => {\n  // Access the content for this specific item\n  const raw = item.json.choices[0].message.content.trim();\n\n  let parsed;\n  try {\n    parsed = JSON.parse(raw);\n  } catch(e) {\n    parsed = {\n      description: \"Could not parse\",\n      industry: \"Unknown\",\n      pain_points: [\"Could not parse\"]\n    };\n  }\n\n  // pain_points is an array — join it into a readable string\n  const painPointsString = Array.isArray(parsed.pain_points) \n    ? parsed.pain_points.join(\", \") \n    : \"Could not parse\";\n\n  // Return the result for this specific row\n  return {\n    json: {\n      description: parsed.description,\n      industry: parsed.industry,\n      pain_points: painPointsString\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        -96
+      ],
+      "id": "06ddd6f2-c03c-488c-92bc-46d1e05dac7a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs",
+          "mode": "list",
+          "cachedResultName": "Lead Enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Description": "={{ $json.description }}",
+            "Industry ": "={{ $json.industry }}",
+            "Pain Points": "={{ $json.pain_points }}",
+            "Enriched At": "={{ $now }}",
+            "Website": "={{ $('If').item.json.Website }}",
+            "Company Name": "={{ $('If').item.json['Company Name'] }}"
+          },
+          "matchingColumns": [
+            "Website"
+          ],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website",
+              "displayName": "Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Industry ",
+              "displayName": "Industry ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pain Points",
+              "displayName": "Pain Points",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Enriched At",
+              "displayName": "Enriched At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        -96
+      ],
+      "id": "14af2841-2f76-47b7-bd16-33a4044010e1",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b9979886-af60-4641-8320-088cb2940619",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "25b26745c7504fc3c9e13bd839c38398823de222a8c910646fe2f2863077c635"
+  },
+  "id": "RnIzBjTfsWJBjiPN",
+  "tags": []
+}
