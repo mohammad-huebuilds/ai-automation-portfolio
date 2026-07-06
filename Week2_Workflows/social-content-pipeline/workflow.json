@@ -1,0 +1,377 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "17b4aa4f-835e-4690-9cad-b016633ca37e",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1F3fakPFZFeVRpwAsqF_4uTC8LaqLGM3JUMGCHMTXymc",
+          "mode": "list",
+          "cachedResultName": "Content Queue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F3fakPFZFeVRpwAsqF_4uTC8LaqLGM3JUMGCHMTXymc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F3fakPFZFeVRpwAsqF_4uTC8LaqLGM3JUMGCHMTXymc/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Status",
+              "lookupValue": "Queued"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "27fec340-a2e0-466f-b7a8-0f4c370d9d5f",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": " Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"max_tokens\": 400,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a social media copywriter who writes in a direct, human tone. No corporate speak, no excessive enthusiasm, no emojis unless they add real value.\\n\\nTopic: {{ $json.Topic }}\\n\\nWrite one LinkedIn post and one X post for this topic.\\n\\nLinkedIn guidelines:\\n- 3-4 sentences\\n- Professional but conversational\\n- Add a genuine insight, not just a restatement of the topic\\n- End with a question that invites real discussion\\n- No hashtags\\n\\nX guidelines:\\n- Under 240 characters strictly\\n- One sharp, specific take\\n- No hashtags\\n- Sounds like something a smart person would say, not a brand\\n\\nReturn ONLY valid JSON, no extra text:\\n{\\n  \\\"linkedin\\\": \\\"the linkedin post\\\",\\n  \\\"x_post\\\": \\\"the x post\\\"\\n}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "e4a99490-20f6-43a6-86b0-d90e9418c327",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\n\nfor (const item of $input.all()) {\n  let raw = item.json.choices[0].message.content.trim();\n\n  // strip markdown code fences if the model added them\n  raw = raw.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```\\s*$/i, '');\n\n  // pull out just the { ... } block in case there's extra text around it\n  const start = raw.indexOf('{');\n  const end = raw.lastIndexOf('}');\n  if (start !== -1 && end !== -1) {\n    raw = raw.substring(start, end + 1);\n  }\n\n  let parsed;\n  try {\n    parsed = JSON.parse(raw);\n  } catch (e) {\n    parsed = {\n      linkedin: \"Could not generate LinkedIn post.\",\n      x_post: \"Could not generate X post.\"\n    };\n  }\n\n  const xPost = parsed.x_post || \"\";\n  const xPostFlagged = xPost.length > 240\n    ? `[OVER LIMIT - ${xPost.length} chars] ${xPost}`\n    : xPost;\n\n  items.push({\n    json: {\n      linkedin: parsed.linkedin,\n      x_post: xPostFlagged,\n      topic: item.json.topic\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "9ad955ab-76ff-48c0-904b-f3ccab102afa",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1F3fakPFZFeVRpwAsqF_4uTC8LaqLGM3JUMGCHMTXymc",
+          "mode": "list",
+          "cachedResultName": "Content Queue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F3fakPFZFeVRpwAsqF_4uTC8LaqLGM3JUMGCHMTXymc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F3fakPFZFeVRpwAsqF_4uTC8LaqLGM3JUMGCHMTXymc/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "LinkedIn Draft": "={{ $json.linkedin }}",
+            "X Draft": "={{ $json.x_post }}",
+            "Status": "Ready to Review",
+            "Created At": "={{ $now.setZone('Asia/Beirut').format('LLL dd, yyyy HH:mm') }}",
+            "Topic": "={{ $('Get row(s) in sheet').item.json.Topic }}"
+          },
+          "matchingColumns": [
+            "Topic"
+          ],
+          "schema": [
+            {
+              "id": "Topic",
+              "displayName": "Topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Platform",
+              "displayName": "Platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn Draft",
+              "displayName": "LinkedIn Draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "X Draft",
+              "displayName": "X Draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created At",
+              "displayName": "Created At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reviewed At",
+              "displayName": "Reviewed At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        0
+      ],
+      "id": "040ffe1e-b47a-41b1-9b2c-ad8387be3ee0",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BELPKPR6K",
+          "mode": "id"
+        },
+        "text": "=📝 *New content ready for review*\n\n*Topic:* {{ $json.Topic }}\n\n\n*LINKEDIN:*\n{{ $json['LinkedIn Draft'] }}\n\n*X:*\n{{ $json['X Draft'] }}\n\n━━━━━━━━━━━━━━\n✅ Open the Content Queue sheet to review and approve",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "09260e48-e805-4fee-a47d-d243ced49fae",
+      "name": "Send a message",
+      "webhookId": "c25a6d0c-6142-42ff-a7b7-17e2dead3a19",
+      "credentials": {
+        "slackApi": {
+          "id": "FQ3g5yceujQzfmA7",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        224
+      ],
+      "id": "3c1803a6-5208-4d2b-833a-39a9bf358d26",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BF5SCCT7E",
+          "mode": "id"
+        },
+        "text": "=🚨 Content Pipeline failed \n\nError: = {{ $json.execution.error }}\nNode: {{ $json.execution.lastNodeExecuted }}\nTime: {{ $now }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        224
+      ],
+      "id": "8274ed02-7a6f-425e-a5dc-6671f7768631",
+      "name": "Send a message1",
+      "webhookId": "21aa62af-1d5b-4133-b368-193d8b5cc3df",
+      "credentials": {
+        "slackApi": {
+          "id": "FQ3g5yceujQzfmA7",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b72241d5-46d3-40d2-a162-748cd6dee046",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "25b26745c7504fc3c9e13bd839c38398823de222a8c910646fe2f2863077c635"
+  },
+  "id": "16eXvuh6WEtOxpc4",
+  "tags": []
+}

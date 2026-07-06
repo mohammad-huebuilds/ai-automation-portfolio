@@ -1,0 +1,608 @@
+{
+  "name": "Day11",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "8e3f3e62-1d4a-4f65-9614-b692efe1f7ec",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs",
+          "mode": "list",
+          "cachedResultName": "Lead Enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Description"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        192,
+        0
+      ],
+      "id": "3b3b4850-2b5e-49b6-b0d6-ad60d4a0c673",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e75ea9c8-c2c5-4e86-a102-2e46a32c3a61",
+              "leftValue": "={{ $json.Website }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "70a7c191-ad69-4156-a9e6-e91b893c68f9",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.Website }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        864,
+        -96
+      ],
+      "id": "9bf666c8-423f-49ee-ab77-17aec153ee41",
+      "name": "HTTP Request",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map over ALL items in the input, not just the first one\nreturn $input.all().map(item => {\n  const html = item.json.data || \"\";\n\n  // Strip HTML tags\n  const text = html\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, \"\")\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, \"\")\n    .replace(/<[^>]+>/g, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\n  const trimmed = text.substring(0, 2000);\n\n  // Return the object for THIS specific row\n  return {\n    json: {\n      website_text: trimmed,\n      company_name: item.json['Company Name'],\n      website: item.json.Website\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        -96
+      ],
+      "id": "97180f4a-eedb-48a4-92d7-b8c14c55541a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a business analyst. Based on this company website text, analyze the company.\\n\\nCompany: {{ $json.company_name }}\\nWebsite text: {{ $json.website_text }}\\n\\nReturn ONLY valid JSON, no extra text:\\n{\\n  \\\"description\\\": \\\"one sentence explaining what this company does\\\",\\n  \\\"industry\\\": \\\"the industry they operate in, 2-3 words\\\",\\n  \\\"pain_points\\\": [\\\"pain point 1\\\", \\\"pain point 2\\\", \\\"pain point 3\\\"]\\n}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1312,
+        -96
+      ],
+      "id": "d6ddb94d-c305-4acb-bbc2-a996ccf74f90",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map over all incoming items from the Groq node\nreturn $input.all().map(item => {\n  // Access the content for this specific item\n  const raw = item.json.choices[0].message.content.trim();\n\n  let parsed;\n  try {\n    parsed = JSON.parse(raw);\n  } catch(e) {\n    parsed = {\n      description: \"Could not parse\",\n      industry: \"Unknown\",\n      pain_points: [\"Could not parse\"]\n    };\n  }\n\n  // pain_points is an array — join it into a readable string\n  const painPointsString = Array.isArray(parsed.pain_points) \n    ? parsed.pain_points.join(\", \") \n    : \"Could not parse\";\n\n  // Return the result for this specific row\n  return {\n    json: {\n      description: parsed.description,\n      industry: parsed.industry,\n      pain_points: painPointsString\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        -96
+      ],
+      "id": "06ddd6f2-c03c-488c-92bc-46d1e05dac7a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs",
+          "mode": "list",
+          "cachedResultName": "Lead Enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Description": "={{ $json.description }}",
+            "Industry ": "={{ $json.industry }}",
+            "Pain Points": "={{ $json.pain_points }}",
+            "Enriched At": "={{ $now.setZone('Asia/Beirut').format('LLL dd, yyyy HH:mm') }}",
+            "Website": "={{ $('If').item.json.Website }}",
+            "Company Name": "={{ $('If').item.json['Company Name'] }}"
+          },
+          "matchingColumns": [
+            "Website"
+          ],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website",
+              "displayName": "Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Industry ",
+              "displayName": "Industry ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pain Points",
+              "displayName": "Pain Points",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Enriched At",
+              "displayName": "Enriched At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1760,
+        -96
+      ],
+      "id": "14af2841-2f76-47b7-bd16-33a4044010e1",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BF5SCCT7E",
+          "mode": "id"
+        },
+        "text": "=Lead Enrichment workflow failed\n\nError: {{ $json.execution.error.message }}\nNode that failed: {{ $json.execution.lastNodeExecuted }}\nTime: {{ $now.setZone('Asia/Beirut').format('LLL dd, yyyy HH:mm') }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        192,
+        320
+      ],
+      "id": "8601930d-0a76-4eaa-952f-8f639379bf86",
+      "name": "Send a message",
+      "webhookId": "8158009e-514c-43ab-a2f4-ccbaf2a808d5",
+      "credentials": {
+        "slackApi": {
+          "id": "FQ3g5yceujQzfmA7",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BF5SCCT7E",
+          "mode": "id"
+        },
+        "text": "=⚠️ Skipped a row in Lead Enrichment\n\nCompany: {{ $('Get row(s) in sheet').item.json['Company Name'] }}\nReason: Website field is empty\n\nAdd a website URL to this row and re-run.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        640,
+        96
+      ],
+      "id": "0a1794f9-2aad-4a64-b072-f712a6fd15f1",
+      "name": "Send a message1",
+      "webhookId": "8158009e-514c-43ab-a2f4-ccbaf2a808d5",
+      "credentials": {
+        "slackApi": {
+          "id": "FQ3g5yceujQzfmA7",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        -96
+      ],
+      "id": "bb2df36d-61c7-4340-8d3b-58387a5a7403",
+      "name": "Wait",
+      "webhookId": "450fedc6-dd6f-4866-bcf3-ebd9dd35ab1a"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BELPKPR6K",
+          "mode": "id"
+        },
+        "text": "=✅ Lead Enrichment run complete\n\nCompanies processed: {{ $runIndex + 1 }}\nTime: {{ $now.setZone('Asia/Beirut').format('LLL dd, yyyy HH:mm') }}\n\nGoogle Sheet has been updated.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1984,
+        -96
+      ],
+      "id": "21ef16e9-21e1-49c2-b585-5b6032e5fb6a",
+      "name": "Send a message2",
+      "webhookId": "8158009e-514c-43ab-a2f4-ccbaf2a808d5",
+      "credentials": {
+        "slackApi": {
+          "id": "FQ3g5yceujQzfmA7",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs",
+          "mode": "list",
+          "cachedResultName": "Lead Enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1680991432,
+          "mode": "list",
+          "cachedResultName": "Run Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aIWly_s0p2c3Kaa4CNt5FGZ94wer8wnahLffW9acENs/edit#gid=1680991432"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Run Date": "={{ $now.setZone('Asia/Beirut').format('LLL dd, yyyy HH:mm') }}",
+            "Rows Processed": "={{ $runIndex + 1 }}",
+            "Status": "Success"
+          },
+          "matchingColumns": [
+            "Run Date"
+          ],
+          "schema": [
+            {
+              "id": "Run Date",
+              "displayName": "Run Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Rows Processed",
+              "displayName": "Rows Processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2208,
+        -96
+      ],
+      "id": "51ea2be3-cb1d-4231-b810-6e41b3157bbc",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "F8veQrg4boCfaGQo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        320
+      ],
+      "id": "3a02dd2b-797a-4913-b448-8ea7e34bff4c",
+      "name": "Error trigger handler"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error trigger handler": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2f05590e-812d-4bd1-ab30-e9c36da74123",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "25b26745c7504fc3c9e13bd839c38398823de222a8c910646fe2f2863077c635"
+  },
+  "id": "RnIzBjTfsWJBjiPN",
+  "tags": []
+}
