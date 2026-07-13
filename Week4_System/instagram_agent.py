@@ -256,9 +256,10 @@ researcher = Agent(
     role="Research Analyst",
     goal="Find the most visually interesting and shareable angle on this topic for Instagram",
     backstory="""You research topics for social media content creators. 
-    Look for angles that translate well to visual setups — striking metaphors, 
-    stark contrasts, or concepts that instantly halt scrolling workflows.""",
-    tools=[web_search],
+    You synthesize a strong, concrete hook and a visual angle using your own reasoning.
+    Do not try to call search tools for abstract creative concepts like visual metaphors.
+    Focus on a crisp angle that translates well to a striking visual setup.""",
+    tools=[],
     llm=llm,
     verbose=True,
     allow_delegation=False
@@ -293,8 +294,8 @@ caption_writer = Agent(
 # ─────────────────────────────────────────────
 def create_tasks(topic: str):
     research_task = Task(
-        description=f"Research this topic for an Instagram post: {topic}\nFind a visual metaphor and a unique hook. Max 100 words.",
-        expected_output="A brief containing one surprising fact, a visual concept, and its tech-audience relevance.",
+        description=f"Research this topic for an Instagram post: {topic}\nUse your own reasoning only. Do not call any web tools. Find one surprising angle, one concrete visual concept, and one unique hook. Max 100 words.",
+        expected_output="A brief containing one surprising fact, a concrete visual concept, and its tech-audience relevance.",
         agent=researcher
     )
     
